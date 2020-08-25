@@ -55,7 +55,7 @@ build-tf1-gpu:
 .PHONY: build-tf2-gpu
 build-tf2-gpu:
 	docker build -f Dockerfile.gpu \
-		--build-arg CUDA="10.1" \
+		--build-arg CUDA="11.0" \
 		--build-arg TENSORFLOW_PIP="tensorflow==2.2.0" \
 		--build-arg TORCH_PIP="torch==1.4.0" \
 		--build-arg TORCHVISION_PIP="torchvision==0.5.0" \

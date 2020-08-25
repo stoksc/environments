@@ -1,5 +1,4 @@
-ARG CUDA
-FROM nvidia/cuda:${CUDA}-cudnn7-devel-ubuntu18.04
+FROM nvcr.io/nvidia/pytorch:20.07-py3
 
 RUN rm -f /etc/apt/sources.list.d/*
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
@@ -30,53 +29,19 @@ RUN apt-get update \
 		wget \
 	&& rm -rf /var/lib/apt/lists/*
 
-ARG CONDA_DIR="/opt/conda"
-ARG CONDA_INSTALLER="Miniconda3-4.7.10-Linux-x86_64.sh"
-ARG CONDA_MD5="1c945f2b3335c7b2b15130b1b2dc5cf4"
-ARG CONDA_URL="https://repo.continuum.io/miniconda"
-ENV CONDA_DIR="${CONDA_DIR}" PATH="${CONDA_DIR}/bin:${PATH}"
-
-RUN cd /tmp \
- && mkdir -p "${CONDA_DIR}" \
- && curl --retry 3 -fsSL -O "${CONDA_URL}/${CONDA_INSTALLER}" \
- && echo "${CONDA_MD5}  ${CONDA_INSTALLER}" | md5sum -c - \
- && bash "./${CONDA_INSTALLER}" -u -b -p "${CONDA_DIR}" \
- && rm -f "./${CONDA_INSTALLER}"
-
-ENV PYTHONUNBUFFERED=1 PYTHONFAULTHANDLER=1 PYTHONHASHSEED=0
-
-RUN conda install python=3.6
-
-COPY profiler /opt/pedl/profiler
-# Stock pyflame writes stack traces only at the end of the sampling period.
-# Patch pyflame to have a new option that periodically dumps stack traces to
-# facilitate profiling long running programs.
-RUN mkdir -p /build \
-  && cd /build \
-  && curl -fsSL https://github.com/uber/pyflame/archive/v1.6.7.tar.gz | tar xzvf - \
-  && cd /build/pyflame-1.6.7 \
-  && patch -p1 < /opt/pedl/profiler/pyflame-add-output-rate.patch \
-  && patch -p1 < /opt/pedl/profiler/pyflame-fix-for-conda.patch \
-  && ./autogen.sh \
-  && PY36_CFLAGS='-I/opt/conda/include/python3.6m' \
-     PY36_LIBS='-L/opt/conda/lib -lpython3.6m' \
-     ./configure \
-  && make install
 
 RUN apt-get update -y && echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
 RUN apt-get install apt-transport-https ca-certificates gnupg -y
 RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
 RUN apt-get update -y && apt-get install google-cloud-sdk -y
 
+
+RUN conda update --all
 ARG TENSORFLOW_PIP
-ARG TORCH_PIP
-ARG TORCHVISION_PIP
 ARG TENSORPACK_PIP
-RUN if [ "$TENSORFLOW_PIP" ]; then ${CONDA_DIR}/bin/python3.6 -m pip install $TENSORFLOW_PIP; fi
-RUN if [ "$TORCH_PIP" ]; then ${CONDA_DIR}/bin/python3.6 -m pip install $TORCH_PIP; fi
-RUN if [ "$TORCHVISION_PIP" ]; then ${CONDA_DIR}/bin/python3.6 -m pip install $TORCHVISION_PIP; fi
-RUN if [ "$TENSORPACK_PIP" ]; then ${CONDA_DIR}/bin/python3.6 -m pip install $TENSORPACK_PIP; fi
-RUN ${CONDA_DIR}/bin/python3.6 -m pip install GPUtil
+RUN if [ "$TENSORFLOW_PIP" ]; then python -m pip install $TENSORFLOW_PIP; fi
+RUN if [ "$TENSORPACK_PIP" ]; then python -m pip install $TENSORPACK_PIP; fi
+RUN python -m pip install GPUtil
 
 ARG TORCH_CUDA_ARCH_LIST="3.7;6.0;6.1;6.2;7.0;7.5"
 RUN if [ "$TORCH_PIP" ]; then pip install --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" git+https://github.com/determined-ai/apex.git@37cdaf4ad57ab4e7dd9ef13dbed7b29aa939d061; fi
@@ -95,19 +60,19 @@ RUN git clone https://github.com/determined-ai/nccl.git /tmp/pedl_nccl\
  && ldconfig\
  && rm -rf /tmp/pedl_nccl
 
-RUN ${CONDA_DIR}/bin/python3.6 -m pip install determined determined-cli
+RUN python -m pip install determined determined-cli
 
 # We uninstall these packages after installing. This ensures that we can
 # successfully install these packages into containers running as non-root.
 # `pip` does not uninstall dependencies, so we still have all the dependencies
 # installed.
-RUN ${CONDA_DIR}/bin/python3.6 -m pip uninstall -y determined determined-cli determined-common
+RUN python -m pip uninstall -y determined determined-cli determined-common
 
 COPY files/additional-requirements.txt files/additional-requirements.txt
-RUN ${CONDA_DIR}/bin/python3.6 -m pip install -r files/additional-requirements.txt
+RUN python -m pip install -r files/additional-requirements.txt
 
 COPY files/notebook-requirements.txt files/notebook-requirements.txt
-RUN ${CONDA_DIR}/bin/python3.6 -m pip install -r files/notebook-requirements.txt
+RUN python -m pip install -r files/notebook-requirements.txt
 ENV JUPYTER_CONFIG_DIR=/run/determined/jupyter/config JUPYTER_DATA_DIR=/run/determined/jupyter/data JUPYTER_RUNTIME_DIR=/run/determined/jupyter/runtime
 
 # Add a det-nobody user. Unlike the traditional nobody user, det-nobody will
@@ -124,3 +89,5 @@ COPY libnss_determined /tmp/libnss_determined
 RUN make -C /tmp/libnss_determined libnss_determined.so.2 install \
   && rm -rf /tmp/libnss_determined \
   && sed -E -i -e 's/^((passwd|shadow|group):.*)/\1 determined/' /etc/nsswitch.conf
+
+RUN python -m pip install ruamel.yaml==0.14.12 --ignore-installed
