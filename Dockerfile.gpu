@@ -1,5 +1,5 @@
-ARG CUDA
-FROM nvidia/cuda:${CUDA}-cudnn7-devel-ubuntu18.04
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
 
 RUN rm -f /etc/apt/sources.list.d/*
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
@@ -71,13 +71,16 @@ RUN apt-get install apt-transport-https ca-certificates gnupg -y
 RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
 RUN apt-get update -y && apt-get install google-cloud-sdk -y
 
+ARG NVIDIA_PYINDEX
+RUN if [ "$NVIDIA_PYINDEX" ]; then ${CONDA_DIR}/bin/python3.6 -m pip install nvidia-pyindex; fi
+
 ARG TENSORFLOW_PIP
 ARG TORCH_PIP
 ARG TORCHVISION_PIP
 ARG TENSORPACK_PIP
 RUN if [ "$TENSORFLOW_PIP" ]; then ${CONDA_DIR}/bin/python3.6 -m pip install $TENSORFLOW_PIP; fi
-RUN if [ "$TORCH_PIP" ]; then ${CONDA_DIR}/bin/python3.6 -m pip install $TORCH_PIP; fi
-RUN if [ "$TORCHVISION_PIP" ]; then ${CONDA_DIR}/bin/python3.6 -m pip install $TORCHVISION_PIP; fi
+RUN if [ "$TORCH_PIP" ]; then ${CONDA_DIR}/bin/python3.6 -m pip install $TORCH_PIP -f https://download.pytorch.org/whl/torch_stable.html; fi
+RUN if [ "$TORCHVISION_PIP" ]; then ${CONDA_DIR}/bin/python3.6 -m pip install $TORCHVISION_PIP -f https://download.pytorch.org/whl/torch_stable.html; fi
 RUN if [ "$TENSORPACK_PIP" ]; then ${CONDA_DIR}/bin/python3.6 -m pip install $TENSORPACK_PIP; fi
 RUN ${CONDA_DIR}/bin/python3.6 -m pip install GPUtil
 
@@ -95,7 +98,7 @@ RUN git clone https://github.com/determined-ai/nccl.git /tmp/det_nccl\
  && (cd /tmp/det_nccl && git checkout -q 8768cb3f881ce198825294b62a435e3f3a804baf)\
  && make -C /tmp/det_nccl -j 4\
  && ldconfig /usr/local/cuda/targets/x86_64-linux/lib/stubs \
- && pip install --no-cache-dir git+https://github.com/determined-ai/horovod.git@b04a363dd53a890d38c8a6762628e14822cc0362\
+ && pip install --no-cache-dir git+https://github.com/determined-ai/horovod.git@aeb74232db9ca902b658c25487d7367ea4e26a41\
  && ldconfig\
  && rm -rf /tmp/det_nccl
 

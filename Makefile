@@ -6,6 +6,7 @@ CPU_PREFIX := determinedai/environments:py-3.6.9-
 CPU_SUFFIX := -cpu
 CUDA_100_PREFIX := determinedai/environments:cuda-10.0-
 CUDA_101_PREFIX := determinedai/environments:cuda-10.1-
+CUDA_110_PREFIX := determinedai/environments:cuda-11.0-
 GPU_SUFFIX := -gpu
 ARTIFACTS_DIR := /tmp/artifacts
 
@@ -13,6 +14,10 @@ export CPU_TF1_ENVIRONMENT_NAME := $(CPU_PREFIX)pytorch-1.4-tf-1.15$(CPU_SUFFIX)
 export GPU_TF1_ENVIRONMENT_NAME := $(CUDA_100_PREFIX)pytorch-1.4-tf-1.15$(GPU_SUFFIX)
 export CPU_TF2_ENVIRONMENT_NAME := $(CPU_PREFIX)pytorch-1.4-tf-2.2$(CPU_SUFFIX)
 export GPU_TF2_ENVIRONMENT_NAME := $(CUDA_101_PREFIX)pytorch-1.4-tf-2.2$(GPU_SUFFIX)
+
+export CUDA_11_NVIDIA_TF_ENVIRONMENT_NAME := $(CUDA_110_PREFIX)pytorch-1.7-tf-1.15$(GPU_SUFFIX)
+export CUDA_11_TF2_ENVIRONMENT_NAME := $(CUDA_110_PREFIX)pytorch-1.7-tf-2.4rc$(GPU_SUFFIX)
+export CUDA_11_PYTORCH_ENVIRONMENT_NAME := $(CUDA_110_PREFIX)pytorch-1.7$(GPU_SUFFIX)
 
 # Timeout used by packer for AWS operations. Default is 120 (30 minutes) for
 # waiting for AMI availablity. Bump to 360 attempts = 90 minutes.
@@ -43,6 +48,7 @@ build-tf2-cpu:
 build-tf1-gpu:
 	docker build -f Dockerfile.gpu \
 		--build-arg CUDA="10.0" \
+		--build-arg CUDNN="7" \
 		--build-arg TENSORFLOW_PIP="tensorflow-gpu==1.15.4" \
 		--build-arg TORCH_PIP="torch==1.4.0+cu100 -f https://download.pytorch.org/whl/torch_stable.html" \
 		--build-arg TORCHVISION_PIP="torchvision==0.5.0+cu100 -f https://download.pytorch.org/whl/torch_stable.html" \
@@ -56,7 +62,7 @@ build-tf1-gpu:
 .PHONY: build-tf2-gpu
 build-tf2-gpu:
 	docker build -f Dockerfile.gpu \
-		--build-arg CUDA="10.1" \
+		--build-arg BASE_IMAGE="nvidia/cuda:10.1-cudnn7-devel-ubuntu18.04" \
 		--build-arg TENSORFLOW_PIP="tensorflow==2.2.1" \
 		--build-arg TORCH_PIP="torch==1.4.0" \
 		--build-arg TORCHVISION_PIP="torchvision==0.5.0" \
@@ -64,6 +70,45 @@ build-tf2-gpu:
 		--build-arg HOROVOD_WITH_PYTORCH="1" \
 		-t $(GPU_TF2_ENVIRONMENT_NAME)-$(SHORT_GIT_HASH) \
 		-t $(GPU_TF2_ENVIRONMENT_NAME)-$(VERSION) \
+		.
+
+.PHONY: build-cuda-11-tf1
+build-cuda-11-tf1:
+	docker build -f Dockerfile.gpu \
+		--build-arg BASE_IMAGE="nvidia/cuda:11.0-cudnn8-devel-ubuntu18.04" \
+		--build-arg NVIDIA_PYINDEX="1" \
+		--build-arg TENSORFLOW_PIP="nvidia-tensorflow[horovod]" \
+		--build-arg TORCH_PIP="torch==1.7.0+cu110" \
+		--build-arg TORCHVISION_PIP="torchvision==0.8.1+cu110" \
+		--build-arg HOROVOD_WITH_TENSORFLOW="1" \
+		--build-arg HOROVOD_WITH_PYTORCH="1" \
+		-t $(CUDA_11_NVIDIA_TF_ENVIRONMENT_NAME)-$(SHORT_GIT_HASH) \
+		-t $(CUDA_11_NVIDIA_TF_ENVIRONMENT_NAME)-$(VERSION) \
+		.
+
+.PHONY: build-cuda-11-tf2
+build-cuda-11-tf2:
+	docker build -f Dockerfile.gpu \
+		--build-arg BASE_IMAGE="nvidia/cuda:11.0-cudnn8-devel-ubuntu18.04" \
+		--build-arg TENSORFLOW_PIP="tensorflow==2.4.0rc1" \
+		--build-arg TORCH_PIP="torch==1.7.0+cu110" \
+		--build-arg TORCHVISION_PIP="torchvision==0.8.1+cu110" \
+		--build-arg HOROVOD_WITH_TENSORFLOW="1" \
+		--build-arg HOROVOD_WITH_PYTORCH="1" \
+		-t $(CUDA_11_TF2_ENVIRONMENT_NAME)-$(SHORT_GIT_HASH) \
+		-t $(CUDA_11_TF2_ENVIRONMENT_NAME)-$(VERSION) \
+		.
+
+.PHONY: build-cuda-11-pytorch
+build-cuda-11-pytorch:
+	docker build -f Dockerfile.gpu \
+		--build-arg BASE_IMAGE="nvidia/cuda:11.0-cudnn8-devel-ubuntu18.04" \
+		--build-arg TORCH_PIP="torch==1.7.0+cu110" \
+		--build-arg TORCHVISION_PIP="torchvision==0.8.1+cu110" \
+		--build-arg HOROVOD_WITH_PYTORCH="1" \
+		--build-arg HOROVOD_WITH_TENSORFLOW="0" \
+		-t $(CUDA_11_PYTORCH_ENVIRONMENT_NAME)-$(SHORT_GIT_HASH) \
+		-t $(CUDA_11_PYTORCH_ENVIRONMENT_NAME)-$(VERSION) \
 		.
 
 .PHONY: publish-tf1-cpu
@@ -81,6 +126,14 @@ publish-tf1-gpu:
 .PHONY: publish-tf2-gpu
 publish-tf2-gpu:
 	scripts/publish-docker.sh tf2-gpu $(GPU_TF2_ENVIRONMENT_NAME) $(SHORT_GIT_HASH) $(VERSION) $(ARTIFACTS_DIR)
+
+.PHONY: publish-cuda-11-tf1
+publish-cuda-11-tf1:
+	scripts/publish-docker.sh cuda-11-tf1 $(CUDA_11_NVIDIA_TF_ENVIRONMENT_NAME) $(SHORT_GIT_HASH) $(VERSION) $(ARTIFACTS_DIR)
+
+.PHONY: publish-cuda-11-tf2
+publish-cuda-11-tf2:
+	scripts/publish-docker.sh cuda-11-tf2 $(CUDA_11_TF2_ENVIRONMENT_NAME) $(SHORT_GIT_HASH) $(VERSION) $(ARTIFACTS_DIR)
 
 .PHONY: publish-cloud-images
 publish-cloud-images:
