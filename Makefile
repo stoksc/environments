@@ -16,6 +16,7 @@ export CPU_TF1_ENVIRONMENT_NAME := $(CPU_PREFIX)pytorch-1.7-tf-1.15$(CPU_SUFFIX)
 export GPU_TF1_ENVIRONMENT_NAME := $(CUDA_102_PREFIX)pytorch-1.7-tf-1.15$(GPU_SUFFIX)
 export CPU_TF2_ENVIRONMENT_NAME := $(CPU_PREFIX)pytorch-1.7-lightning-1.2-tf-2.4$(CPU_SUFFIX)
 export GPU_TF2_ENVIRONMENT_NAME := $(CUDA_102_PREFIX)pytorch-1.7-lightning-1.2-tf-2.4$(GPU_SUFFIX)
+export GPU_PT181_ENVIRONMENT_NAME := $(CUDA_102_PREFIX)pytorch-1.8.1-lightning-1.2-tf-2.4$(GPU_SUFFIX)
 export CUDA_11_ENVIRONMENT_NAME := $(CUDA_110_PREFIX)pytorch-1.7-lightning-1.2-tf-2.4$(GPU_SUFFIX)
 
 # Timeout used by packer for AWS operations. Default is 120 (30 minutes) for
@@ -84,6 +85,25 @@ build-tf2-gpu:
 		-t $(DOCKERHUB_REGISTRY)/$(GPU_TF2_ENVIRONMENT_NAME)-$(VERSION) \
 		-t $(NGC_REGISTRY)/$(GPU_TF2_ENVIRONMENT_NAME)-$(SHORT_GIT_HASH) \
 		-t $(NGC_REGISTRY)/$(GPU_TF2_ENVIRONMENT_NAME)-$(VERSION) \
+		.
+
+.PHONY: build-torch181-gpu
+build-torch181-gpu:
+	docker build -f Dockerfile.gpu \
+		--build-arg PYTHON_VERSION="3.7" \
+		--build-arg BASE_IMAGE="nvidia/cuda:10.2-cudnn7-devel-ubuntu18.04" \
+		--build-arg TENSORFLOW_PIP="tensorflow==2.4.1" \
+		--build-arg TORCH_PIP="torch==1.8.1 -f https://download.pytorch.org/whl/cu102/torch_stable.html" \
+		--build-arg TORCHVISION_PIP="torchvision==0.9.0 -f https://download.pytorch.org/whl/cu102/torch_stable.html" \
+		--build-arg LIGHTNING_PIP="pytorch_lightning==1.2.0" \
+		--build-arg TORCH_CUDA_ARCH_LIST="3.7;6.0;6.1;6.2;7.0;7.5" \
+		--build-arg APEX_GIT="https://github.com/determined-ai/apex.git@37cdaf4ad57ab4e7dd9ef13dbed7b29aa939d061" \
+		--build-arg HOROVOD_WITH_TENSORFLOW="1" \
+		--build-arg HOROVOD_WITH_PYTORCH="1" \
+		-t $(DOCKERHUB_REGISTRY)/$(GPU_PT181_ENVIRONMENT_NAME)-$(SHORT_GIT_HASH) \
+		-t $(DOCKERHUB_REGISTRY)/$(GPU_PT181_ENVIRONMENT_NAME)-$(VERSION) \
+		-t $(NGC_REGISTRY)/$(GPU_PT181_ENVIRONMENT_NAME)-$(SHORT_GIT_HASH) \
+		-t $(NGC_REGISTRY)/$(GPU_PT181_ENVIRONMENT_NAME)-$(VERSION) \
 		.
 
 .PHONY: build-cuda-11
